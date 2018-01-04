@@ -53,13 +53,16 @@ class NormalizeInfo {
         'Hermosillo',
         'Villahermosa',
         'Reynosa',
+        'Tampico',
         'Ciudad Victoria',
         'Tlaxcala de Xicohténcatl',
+        'Torreón,',
         'Xalapa-Enríquez',
         'San Miguel de Cozumel',
         'Veracruz',
         'Mérida',
-        'Zacatecas'
+        'Zacatecas',
+        'Nezahualcóyotl'
 
     ];
 
@@ -80,6 +83,7 @@ class NormalizeInfo {
         'Chihuahua',
         'Ciudad de México',
         'Ciudad de Mexico',
+        'Mexico city',
         'CDMX',
         'Coahuila',
         'Colima',
@@ -92,8 +96,9 @@ class NormalizeInfo {
         'Hidalgo',
         'Hgo',
         'Jalisco',
-        'México',
-        'Mexico',
+        'Jal',
+        'Estado de México',
+        'Estado de Mexico',
         'Michoacán',
         'Michoacan',
         'MICH',
@@ -117,6 +122,7 @@ class NormalizeInfo {
         'Sonora',
         'Tabasco',
         'Tamaulipas',
+        'tamaulipas',
         'Tlaxcala',
         'Veracruz',
         'Yucatán',
@@ -124,30 +130,48 @@ class NormalizeInfo {
         'Zacatecas'
     ];
 
-    public function splitAddress($address)
+    public function splitAddress($address, $photographerId, $pdo)
     {
         $response = '';
-
         // Itera en estados
         foreach ($this->states as $state) {
-            $pos = strpos($address, $state);
+
+            $pos = stripos($address, $state);
             if ($pos) {
                 $response .= "ESTADO: $state /";
+                
+                $update = "UPDATE `photographers` SET `state` = (:state) WHERE `id` = (:id)";
+                $statement = $pdo->prepare($update);
+                $statement->bindValue(':id', $photographerId,  PDO::PARAM_STR);
+                $statement->bindValue(':state', $state,  PDO::PARAM_STR);
+                
+                $inserted = $statement->execute();
+                if($inserted){
+                    echo 'State Success';
+                }
                 // se guarda el state en BD - TODO
-            } /*else {
-                $response .= "$state NO encontrado\n";
-            }*/
+            } else {
+                //x$response .= "ESTADO: $state NO encontrado\n";
+            }
         }
 
         // Itera en ciudades
         foreach ($this->cities as $city) {
             $pos = strpos($address, $city);
             if ($pos) {
-                 $response .= "CIUDAD: $city";
-                // se guarda el city en BD - TODO
-            } /*else {
-                $response .= "$city NO encontrada\n";
-            }*/
+                $response .= "CIUDAD: $city";
+                $update = "UPDATE `photographers` SET `city` = (:city) WHERE `id` = (:id)";
+                $statement = $pdo->prepare($update);
+                $statement->bindValue(':id', $photographerId,  PDO::PARAM_STR);
+                $statement->bindValue(':city', $city,  PDO::PARAM_STR);
+                
+                $inserted = $statement->execute();
+                if($inserted){
+                    echo 'City Success';
+                }
+            } else {
+                //$response .= "CIUDAD: $city NO encontrada\n";
+            }
         }
 
         return $response;
@@ -158,10 +182,11 @@ class Executioner {
 
     public function start()
     {
+
         $pdo = new PDO('mysql:host=localhost;dbname=fotec','root', 'root');
-        $pdo->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION );
+        $pdo->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->exec("SET CHARACTER SET utf8"); 
-        $sql = "select users.address,  photographers.city, photographers.state from users
+        $sql = "select users.address,  photographers.id from users
         inner join role_user on  role_user.user_id = users.id
         inner join photographers on photographers.user_id = users.id
         where role_user.role_id = 4
@@ -169,34 +194,14 @@ class Executioner {
         and photographers.city = ''
         or photographers.state = ''";
         $data = $pdo->query($sql);
-        /*
-        $rows = $data->fetchAll();
-        foreach ($data as $dat) {
-            var_dump($dat);
-        }
-        */
-
-        /*
-        select users.address,  photographers.city, photographers.state from users
-        inner join role_user on  role_user.user_id = users.id
-        inner join photographers on photographers.user_id = users.id
-        where role_user.role_id = 4
-        and users.address is not null
-        and photographers.city = ''
-        or photographers.state = ''
-        */
-
-
         $results = [];
         $normal = new NormalizeInfo;
 
         // Obtener las direcciones de DB que no tienen el campo city y state con info y guardarla en data
 
         echo "started\n";
-        foreach($data as $address) {
-            //results[] = $normal->splitAddress(strtolower ($address[0]));
-            //$results[] = $address[0];
-            var_dump(strtolower ($address[0]));
+        foreach($data as $item) {
+            $results[] = $normal->splitAddress($item[0], $item[1], $pdo);
         }
         echo "finished\n";
 
