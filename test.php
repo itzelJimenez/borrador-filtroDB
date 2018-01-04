@@ -182,10 +182,33 @@ class Executioner {
 
     public function start()
     {
+        $url = 'https://public.opendatasoft.com/api/records/1.0/search/?dataset=estados-de-mexico';
+
+        $ch = curl_init();
+        // Disable SSL verification
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        // Will return the response, if false it print the response
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        // Set the url
+        curl_setopt($ch, CURLOPT_URL,$url);
+        // Execute
+        $estados = curl_exec($ch);
+        // Closing
+        curl_close($ch);
+
+        //var_dump(json_decode($estados, true));
+
+        $estados = file_get_contents($url);
+        // Will dump a beauty json :3
+        var_dump(json_decode($estados, true));
+
+
 
         $pdo = new PDO('mysql:host=localhost;dbname=fotec','root', 'root');
         $pdo->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->exec("SET CHARACTER SET utf8"); 
+
+        // Obtener las direcciones de DB que no tienen el campo city y state con info y guardarla en data
         $sql = "select users.address,  photographers.id from users
         inner join role_user on  role_user.user_id = users.id
         inner join photographers on photographers.user_id = users.id
@@ -197,7 +220,6 @@ class Executioner {
         $results = [];
         $normal = new NormalizeInfo;
 
-        // Obtener las direcciones de DB que no tienen el campo city y state con info y guardarla en data
 
         echo "started\n";
         foreach($data as $item) {
