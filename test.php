@@ -130,11 +130,11 @@ class NormalizeInfo {
         'Zacatecas'
     ];
 
-    public function splitAddress($address, $photographerId, $pdo)
+    public function splitAddress($address, $photographerId, $pdo, $arrayStates, $arrayCities)
     {
         $response = '';
         // Itera en estados
-        foreach ($this->states as $state) {
+        foreach ($arrayStates as $state) {
 
             $pos = stripos($address, $state);
             if ($pos) {
@@ -156,7 +156,7 @@ class NormalizeInfo {
         }
 
         // Itera en ciudades
-        foreach ($this->cities as $city) {
+        foreach ($arrayCities as $city) {
             $pos = strpos($address, $city);
             if ($pos) {
                 $response .= "CIUDAD: $city";
@@ -182,27 +182,41 @@ class Executioner {
 
     public function start()
     {
-        $url = 'https://public.opendatasoft.com/api/records/1.0/search/?dataset=estados-de-mexico';
+        $urlStates = 'https://public.opendatasoft.com/api/records/1.0/search/?dataset=estados-de-mexico&rows=32';
+        $urlCities = 'https://public.opendatasoft.com/api/records/1.0/search/?dataset=ciudades-de-mexico&rows=1853&facet=name_1&facet=name_2';
 
         $ch = curl_init();
-        // Disable SSL verification
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        // Will return the response, if false it print the response
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        // Set the url
-        curl_setopt($ch, CURLOPT_URL,$url);
-        // Execute
-        $estados = curl_exec($ch);
-        // Closing
+        curl_setopt($ch, CURLOPT_URL,$urlStates);
+        curl_setopt($ch, CURLOPT_URL,$urlCities);
+        $states = curl_exec($ch);
+        $cities = curl_exec($ch);
         curl_close($ch);
 
-        //var_dump(json_decode($estados, true));
+        $states = file_get_contents($urlStates);
+        $resStates = json_decode($states, true);
+        $states = $resStates['records'];
+        $arrayStates = array(); 
 
-        $estados = file_get_contents($url);
-        // Will dump a beauty json :3
-        var_dump(json_decode($estados, true));
+        $cities = file_get_contents($urlCities);
+        $resCities = json_decode($cities, true);
+        $cities = $resCities['records'];
+        $arrayCities = array(); 
 
+        foreach ($states as $state) {
+            array_push($arrayStates, ucwords($state['fields']['estado']));
+            array_push($arrayStates, quitar_tildes($state['fields']['estado']));
+        }
 
+        array_push($arrayStates, 'Estado De México');
+        array_push($arrayStates, 'Ciudad De México');
+
+        foreach ($cities as $city) {
+            array_push($arrayCities, ucwords($city['fields']['name_2']));
+        }
+
+        array_push($arrayCities, 'Ciudad De México');
 
         $pdo = new PDO('mysql:host=localhost;dbname=fotec','root', 'root');
         $pdo->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -220,11 +234,12 @@ class Executioner {
         $results = [];
         $normal = new NormalizeInfo;
 
-
         echo "started\n";
+
         foreach($data as $item) {
-            $results[] = $normal->splitAddress($item[0], $item[1], $pdo);
+            $results[] = $normal->splitAddress(ucwords(strtolower($item[0])), $item[1], $pdo, $arrayStates, $arrayCities);
         }
+
         echo "finished\n";
 
         return $results;
